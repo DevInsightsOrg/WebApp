@@ -12,6 +12,7 @@ const LoginPage = () => {
     return <Navigate to="/" />;
   }
 
+  // In LoginPage.js
   const handleGitHubLogin = () => {
     setLoggingIn(true);
     const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
@@ -19,7 +20,12 @@ const LoginPage = () => {
     const redirectUri = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/oauth/callback`;
     const scope = 'repo,read:user,user:email';
     
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+    // Generate a random state value and store it
+    const state = Math.random().toString(36).substring(2, 15);
+    console.log("Setting OAuth state:", state); // For debugging
+    localStorage.setItem('oauth_state', state);
+    
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=${state}`;
   };
 
   if (isLoading) {

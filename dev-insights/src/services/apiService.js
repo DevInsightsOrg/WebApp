@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -384,48 +384,113 @@ const mockData = {
 // API service object with methods for different endpoints
 const apiService = {
   // Auth endpoints
-  exchangeCodeForToken: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+  // In apiService.js
+  exchangeCodeForToken: async (code) => {
+    // Track if we've already started this request to avoid duplicates
+    const pendingKey = `pendingExchange_${code.substring(0, 10)}`;
     
-    // Mock successful authentication
-    localStorage.setItem('auth_token', 'mock_token_' + Date.now());
+    // If already processing this code, wait for the result
+    if (window[pendingKey]) {
+      console.log("Exchange already in progress for this code, waiting");
+      try {
+        return await window[pendingKey];
+      } catch (error) {
+        console.error("Pending request failed:", error);
+        // Continue with a new request
+      }
+    }
     
-    return {
-      token: 'mock_token_' + Date.now(),
-      user: mockData.user
-    };
+    // Create a promise to track this request
+    const exchangePromise = (async () => {
+      try {
+        console.log("Exchanging code for token:", code.substring(0, 10) + "...");
+        
+        // Check if we already have a token
+        const existingToken = localStorage.getItem('auth_token');
+        
+        if (existingToken) {
+          try {
+            // Try to validate the existing token
+            const validateResponse = await api.get('/auth/validate');
+            console.log("Existing token validated");
+            return {
+              token: existingToken,
+              user: validateResponse.data.user
+            };
+          } catch (error) {
+            // Token validation failed, continue with code exchange
+            console.log("Existing token invalid, will try code exchange");
+            console.error('Token validation failed:', error);
+            localStorage.removeItem('auth_token');
+          }
+        }
+        
+        const response = await api.post('/auth/github/callback', { code });
+        console.log("Token exchange response received");
+        
+        // Store the token in localStorage
+        if (response.data.token) {
+          localStorage.setItem('auth_token', response.data.token);
+        }
+        
+        return response.data;
+      } catch (error) {
+        console.error('Error exchanging code for token:', error);
+        
+        // Handle code already used
+        if (error.response && error.response.status === 409) {
+          console.log("Code already used, checking for existing token");
+          
+          // Try to validate any existing token
+          const existingToken = localStorage.getItem('auth_token');
+          if (existingToken) {
+            try {
+              const validateResponse = await api.get('/auth/validate');
+              console.log("Existing token validated after 409");
+              return {
+                token: existingToken,
+                user: validateResponse.data.user
+              };
+            } catch (validationError) {
+              console.error('Token validation failed after 409');
+              localStorage.removeItem('auth_token');
+              throw validationError;
+            }
+          }
+        }
+        
+        throw error;
+      } finally {
+        // Clear the pending request marker
+        window[pendingKey] = null;
+      }
+    })();
     
-    // Original API call
-    // const response = await api.post('/auth/github/callback', { code });
-    // return response.data;
+    // Store the promise to prevent duplicate requests
+    window[pendingKey] = exchangePromise;
+    
+    return exchangePromise;
   },
-  
+
   validateToken: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Return mock user data
-    return {
-      user: mockData.user
-    };
-    
-    // Original API call
-    // const response = await api.get('/auth/validate');
-    // return response.data;
+      try {
+          const response = await api.get('/auth/validate');
+          return response.data;
+      } catch (error) {
+          console.error('Error validating token:', error);
+          throw error;
+      }
   },
   
   // Repository endpoints
   getUserRepositories: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 700));
-    
-    // Return mock repositories
-    return mockData.repositories;
-    
-    // Original API call
-    // const response = await api.get('/repositories');
-    // return response.data;
+      try {
+          const response = await api.get('/user/repositories');
+          return response.data;
+      } catch (error) {
+          console.error('Error fetching repositories:', error);
+          throw error;
+      }
   },
   
   getRepositoryDetails: async (repoId) => {
@@ -476,93 +541,93 @@ const apiService = {
   
   // Developer endpoints
   getDevelopers: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    // Return mock developers
-    return mockData.developers;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/developers`, { params });
-    // return response.data;
+    try {
+      const response = await api.get('/analytics/developers');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching developers:', error);
+      console.log('Falling back to mock data');
+      // Return mock data as fallback
+      return mockData.developers;
+    }
   },
   
   getDeveloperProfile: async (repoId, developerId) => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Return mock developer profile
-    return mockData.developerProfiles[developerId] || null;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/developers/${developerId}`);
-    // return response.data;
+    try {
+      const response = await api.get(`/analytics/developer/${developerId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching developer profile:', error);
+      console.log('Falling back to mock data');
+      // Return mock data as fallback
+      return mockData.developerProfiles[developerId] || null;
+    }
   },
   
   // Analytics endpoints
   getDeveloperCategorization: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 700));
-    
-    // Return mock developer categorization
-    return mockData.developerCategories;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/analytics/developer-types`, { params });
-    // return response.data;
+    try {
+      const response = await api.get('/analytics/developer-categorization');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching developer categorization:', error);
+      console.log('Falling back to mock data');
+      // Return mock data as fallback
+      return mockData.developerCategories;
+    }
   },
   
   getContributionMetrics: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 900));
-    
-    // Return mock contribution metrics
-    return mockData.contributionMetrics;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/analytics/contributions`, { params });
-    // return response.data;
+    try {
+      const response = await api.get('/analytics/contribution-metrics');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching contribution metrics:', error);
+      console.log('Falling back to mock data');
+      // Return mock data as fallback
+      return mockData.contributionMetrics;
+    }
   },
   
   getArtifactTraceabilityGraph: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    
-    // Return mock ATG data
-    return mockData.atgData;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/analytics/atg`, { params });
-    // return response.data;
+    try {
+      const response = await api.get('/analytics/artifact-traceability-graph');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching ATG data:', error);
+      console.log('Falling back to mock data');
+      // Return mock data as fallback
+      return mockData.atgData;
+    }
   },
   
   getDeveloperHeatmap: async (repoId, params = {}) => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Filter heatmap data by developer ID if specified
-    let heatmap = [...mockData.heatmapData];
-    if (params.developerId) {
-      heatmap = heatmap.filter(dev => dev.id === params.developerId);
+    try {
+      const queryParams = params.developerId ? `?developer_id=${params.developerId}` : '';
+      const response = await api.get(`/analytics/developer-heatmap${queryParams}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching heatmap data:', error);
+      console.log('Falling back to mock data');
+      // Filter mock data based on developer ID if specified
+      let heatmap = [...mockData.heatmapData];
+      if (params.developerId) {
+        heatmap = heatmap.filter(dev => dev.id === params.developerId);
+      }
+      return heatmap;
     }
-    
-    return heatmap;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/analytics/heatmap`, { params });
-    // return response.data;
   },
-
+  
   getBusFactorAnalysis: async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Return mock bus factor analysis
-    return mockData.busFactorData;
-    
-    // Original API call
-    // const response = await api.get(`/repositories/${repoId}/analytics/bus-factor`, { params });
-    // return response.data;
+    try {
+      const response = await api.get('/analytics/bus-factor-analysis');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching bus factor analysis:', error);
+      console.log('Falling back to mock data');
+      // Return mock data as fallback
+      return mockData.busFactorData;
+    }
   },
   
   // Additional mock methods for GitHub connection

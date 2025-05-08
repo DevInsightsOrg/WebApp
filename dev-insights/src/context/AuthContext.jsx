@@ -9,54 +9,74 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('auth_token'));
+  const [authError, setAuthError] = useState(null);
+  const [isLoginInProgress, setIsLoginInProgress] = useState(false);
 
+  // Load token and validate on mount
   useEffect(() => {
     const validateToken = async () => {
+      const token = localStorage.getItem('auth_token');
       if (!token) {
         setIsLoading(false);
         return;
       }
 
       try {
-        // Verify token with backend
-        const response = await apiService.validateToken(token);
-        setUser(response.user);
-        setIsAuthenticated(true);
+        const data = await apiService.validateToken();
+        if (data && data.user) {
+          setUser(data.user);
+          setIsAuthenticated(true);
+        }
       } catch (error) {
         console.error('Token validation failed:', error);
         localStorage.removeItem('auth_token');
-        setToken(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     validateToken();
-  }, [token]);
+  }, []);
 
   const login = async (code) => {
-    setIsLoading(true);
+    // Prevent multiple concurrent login attempts
+    if (isLoginInProgress) {
+      console.log("Login already in progress, skipping");
+      return false;
+    }
+    
+    setIsLoginInProgress(true);
+    setAuthError(null);
+    
     try {
-      const response = await apiService.exchangeCodeForToken(code);
-      const { token, user } = response;
+      // If we're already authenticated, no need to login again
+      if (isAuthenticated && user) {
+        console.log("Already authenticated, skipping login");
+        return true;
+      }
       
-      localStorage.setItem('auth_token', token);
-      setToken(token);
-      setUser(user);
-      setIsAuthenticated(true);
-      return true;
+      const data = await apiService.exchangeCodeForToken(code);
+      
+      if (data && data.token && data.user) {
+        // Only update state if we have both token and user
+        setUser(data.user);
+        setIsAuthenticated(true);
+        return true;
+      }
+      
+      setAuthError('Invalid response from authentication server');
+      return false;
     } catch (error) {
       console.error('Login failed:', error);
+      setAuthError(error.message || 'Authentication failed');
       return false;
     } finally {
-      setIsLoading(false);
+      setIsLoginInProgress(false);
     }
   };
 
   const logout = () => {
     localStorage.removeItem('auth_token');
-    setToken(null);
     setUser(null);
     setIsAuthenticated(false);
   };
@@ -65,9 +85,9 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
-        token,
         isAuthenticated,
         isLoading,
+        authError,
         login,
         logout
       }}
