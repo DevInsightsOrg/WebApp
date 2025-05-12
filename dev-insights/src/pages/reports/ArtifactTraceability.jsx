@@ -20,12 +20,11 @@ import {
   ListItem,
   ListItemText,
   ToggleButtonGroup,
-  ToggleButton,
-  Tooltip
+  ToggleButton
 } from '@mui/material';
 import ForceGraph2D from 'react-force-graph-2d';
 import { useRepo } from '../../context/RepoContext';
-import apiService from '../../services/apiService';
+import graphDbService from '../../services/graphDbService';
 
 // Color mapping for node types
 const NODE_COLORS = {
@@ -38,9 +37,9 @@ const NODE_COLORS = {
 
 // Edge color mapping based on relationship type
 const EDGE_COLORS = {
-  authored: '#8884d8',
+  collaborated: '#8884d8',
   modified: '#82ca9d',
-  reviewed: '#ffc658',
+  authored: '#ffc658',
   created: '#ff8042',
   resolved: '#0088FE',
   referenced: '#aaaaaa'
@@ -73,25 +72,32 @@ const ArtifactTraceability = () => {
       setError(null);
       
       try {
+        // Parse repository owner and name
+        const [repoOwner, repoName] = selectedRepo.split('/');
+        
         // Fetch developers
-        const developersData = await apiService.getDevelopers(selectedRepo);
+        const developersData = await graphDbService.getDeveloperContributions(repoOwner, repoName);
         setDevelopers(developersData);
         
         // Fetch developer categorization
-        const categorization = await apiService.getDeveloperCategorization(selectedRepo);
+        const categorization = await Promise.all([
+          graphDbService.getJackDevelopers(repoOwner, repoName),
+          graphDbService.getMavenDevelopers(repoOwner, repoName),
+          graphDbService.getConnectorDevelopers(repoOwner, repoName)
+        ]);
+        
         setDeveloperCategories({
-          connectors: categorization.connectors || [],
-          mavens: categorization.mavens || [],
-          jacks: categorization.jacks || []
+          jacks: categorization[0],
+          mavens: categorization[1],
+          connectors: categorization[2]
         });
         
-        // Extract file categories from ATG
-        const atgData = await apiService.getArtifactTraceabilityGraph(selectedRepo);
+        // Fetch critical files to extract categories
+        const criticalFiles = await graphDbService.getCriticalFiles(repoOwner, repoName);
         
-        // Process file nodes to extract categories
-        const fileNodes = atgData.nodes.filter(node => node.type === 'file');
-        const categories = fileNodes.reduce((acc, node) => {
-          const pathParts = node.id.split('/');
+        // Process file paths to extract categories
+        const categories = criticalFiles.reduce((acc, file) => {
+          const pathParts = file.file_path.split('/');
           const category = pathParts.length > 1 ? pathParts[0] : 'root';
           
           if (!acc.includes(category)) {
@@ -103,7 +109,8 @@ const ArtifactTraceability = () => {
         
         setFileCategories(categories);
         
-        // Set graph data
+        // Get graph data
+        const atgData = await graphDbService.getArtifactTraceabilityGraph(repoOwner, repoName);
         setGraphData(atgData);
       } catch (err) {
         console.error('Error fetching traceability data:', err);
@@ -119,12 +126,15 @@ const ArtifactTraceability = () => {
   // Fetch filtered graph data when filters change
   useEffect(() => {
     const fetchFilteredGraphData = async () => {
-      if (!selectedRepo) return;
+      if (!selectedRepo || (!selectedDeveloper && !selectedCategory && graphMode === 'full')) return;
       
       setLoading(true);
       setError(null);
       
       try {
+        // Parse repository owner and name
+        const [repoOwner, repoName] = selectedRepo.split('/');
+        
         let params = {};
         
         if (graphMode === 'developer' && selectedDeveloper) {
@@ -134,7 +144,7 @@ const ArtifactTraceability = () => {
         }
         
         // Fetch filtered ATG data
-        const atgData = await apiService.getArtifactTraceabilityGraph(selectedRepo, params);
+        const atgData = await graphDbService.getArtifactTraceabilityGraph(repoOwner, repoName, params);
         setGraphData(atgData);
       } catch (err) {
         console.error('Error fetching filtered graph data:', err);
@@ -144,13 +154,23 @@ const ArtifactTraceability = () => {
       }
     };
     
-    fetchFilteredGraphData();
+    if (graphMode !== 'full' || selectedDeveloper || selectedCategory) {
+      fetchFilteredGraphData();
+    }
   }, [selectedRepo, graphMode, selectedDeveloper, selectedCategory]);
   
   // Handle graph mode change
   const handleGraphModeChange = (event, newMode) => {
     if (newMode) {
       setGraphMode(newMode);
+      
+      // Reset selections when mode changes
+      if (newMode !== 'developer') {
+        setSelectedDeveloper('');
+      }
+      if (newMode !== 'file') {
+        setSelectedCategory('');
+      }
     }
   };
   
@@ -177,14 +197,14 @@ const ArtifactTraceability = () => {
   };
   
   // Get developer category for a developer
-  const getDeveloperCategory = (developerId) => {
-    if (developerCategories.connectors.includes(developerId)) {
-      return 'Connector';
-    } else if (developerCategories.mavens.includes(developerId)) {
-      return 'Maven';
-    } else if (developerCategories.jacks.includes(developerId)) {
-      return 'Jack';
-    }
+  const getDeveloperCategory = (githubUsername) => {
+    const isJack = developerCategories.jacks.some(dev => dev.github === githubUsername);
+    const isMaven = developerCategories.mavens.some(dev => dev.github === githubUsername);
+    const isConnector = developerCategories.connectors.some(dev => dev.github === githubUsername);
+    
+    if (isConnector) return 'Connector';
+    if (isMaven) return 'Maven';
+    if (isJack) return 'Jack';
     return 'Uncategorized';
   };
   
@@ -271,8 +291,8 @@ const ArtifactTraceability = () => {
                   disabled={loading || developers.length === 0}
                 >
                   {developers.map(dev => (
-                    <MenuItem key={dev.id} value={dev.id}>
-                      {dev.name || dev.username} ({getDeveloperCategory(dev.id)})
+                    <MenuItem key={dev.github} value={dev.github}>
+                      {dev.name || dev.github} ({getDeveloperCategory(dev.github)})
                     </MenuItem>
                   ))}
                 </Select>
@@ -363,7 +383,7 @@ const ArtifactTraceability = () => {
                       const category = getDeveloperCategory(node.id);
                       return `${node.name || node.id} (${category})`;
                     } else if (node.type === 'file') {
-                      return `File: ${node.id}`;
+                      return `File: ${node.name || node.id}`;
                     } else if (node.type === 'commit') {
                       return `Commit: ${node.id.substring(0, 7)}`;
                     } else if (node.type === 'pullRequest') {
@@ -373,13 +393,15 @@ const ArtifactTraceability = () => {
                     }
                     return node.id;
                   }}
-                  linkLabel={(link) => `${link.source.id} ${link.type} ${link.target.id}`}
-                  linkWidth={1.5}
+                  linkLabel={(link) => `${link.source.id || link.source} ${link.type} ${link.target.id || link.target}`}
+                  linkWidth={(link) => 1 + (link.value ? Math.sqrt(link.value) / 3 : 0)}
                   nodeCanvasObjectMode={() => showLabels ? 'after' : undefined}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     if (!showLabels) return;
                     
-                    const label = node.name || node.id.split('/').pop();
+                    const label = node.name || 
+                      (typeof node.id === 'string' ? node.id.split('/').pop() : node.id);
+                    
                     const fontSize = 12 / globalScale;
                     ctx.font = `${fontSize}px Sans-Serif`;
                     ctx.textAlign = 'center';
@@ -477,6 +499,27 @@ const ArtifactTraceability = () => {
                     />
                   </ListItem>
                 </List>
+                
+                <Divider sx={{ my: 2 }} />
+                
+                <Typography variant="subtitle2" gutterBottom>
+                  Connection Types:
+                </Typography>
+                <List dense>
+                  {Object.entries(EDGE_COLORS).map(([type, color]) => (
+                    <ListItem key={type} disablePadding>
+                      <Box
+                        sx={{
+                          width: 16,
+                          height: 4,
+                          bgcolor: color,
+                          mr: 1
+                        }}
+                      />
+                      <ListItemText primary={type.charAt(0).toUpperCase() + type.slice(1)} />
+                    </ListItem>
+                  ))}
+                </List>
               </CardContent>
             </Card>
             
@@ -515,7 +558,7 @@ const ArtifactTraceability = () => {
                 
                 <Typography variant="body2" color="textSecondary">
                   The Artifact Traceability Graph visualizes connections between developers and artifacts
-                  across the repository. This helps identify patterns of collaboration and knowledge distribution.
+                  across the repository, showing collaboration patterns and knowledge distribution in the ReMediCard.io project.
                 </Typography>
               </CardContent>
             </Card>
