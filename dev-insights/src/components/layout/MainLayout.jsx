@@ -28,7 +28,10 @@ import {
   GridOn as HeatmapIcon,
   Settings as SettingsIcon,
   GitHub as GitHubIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  BarChart as BarChartIcon,
+  Storage as StorageIcon,
+  Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import { useRepo } from '../../context/RepoContext';
@@ -109,12 +112,14 @@ const MainLayout = () => {
   const navItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Developers', icon: <PeopleIcon />, path: '/developers' },
-    { text: 'Reports', subItems: [
+    { text: 'Code Contribution Analysis', icon: <AssessmentIcon />, path: '/code-contribution-analysis' },
+    { text: 'Issues and Pull Requests Tracking', icon: <AssignmentIcon />, path: '/issues' },
+    { text: 'Reports', icon: <BarChartIcon />, subItems: [
       { text: 'Artifact Traceability', icon: <AccountTreeIcon />, path: '/reports/traceability' },
       { text: 'Developer Heatmap', icon: <HeatmapIcon />, path: '/reports/heatmap' },
     ]},
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-    { text: 'Repositories', icon: <GitHubIcon />, path: '/settings/repositories' },
+    { text: 'Repositories', icon: <StorageIcon />, path: '/settings/repositories' },
   ];
 
   return (
