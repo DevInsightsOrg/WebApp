@@ -119,10 +119,7 @@ const MainLayout = () => {
     { text: 'Developers', icon: <PeopleIcon />, path: '/developers' },
     { text: 'Code Contribution Analysis', icon: <AssessmentIcon />, path: '/code-contribution-analysis' },
     { text: 'Issues and Pull Requests Tracking', icon: <AssignmentIcon />, path: '/issues' },
-    { text: 'Reports', icon: <BarChartIcon />, subItems: [
-      { text: 'Artifact Traceability', icon: <AccountTreeIcon />, path: '/reports/traceability' },
-      { text: 'Developer Heatmap', icon: <HeatmapIcon />, path: '/reports/heatmap' },
-    ]},
+    { text: 'Artifact Traceability', icon: <AccountTreeIcon />, path: '/reports/traceability' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
     { text: 'Repositories', icon: <StorageIcon />, path: '/settings/repositories' },
   ];

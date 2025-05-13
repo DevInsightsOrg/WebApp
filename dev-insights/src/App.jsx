@@ -15,7 +15,6 @@ import Dashboard from './pages/dashboard/Dashboard';
 import DevelopersList from './pages/developers/DevelopersList';
 import DeveloperProfile from './pages/developers/DeveloperProfile';
 import ArtifactTraceability from './pages/reports/ArtifactTraceability';
-import DeveloperHeatmap from './pages/reports/DeveloperHeatmap';
 import IssuesTracking from './pages/IssuesTracking';
 import Repositories from './pages/settings/Repositories';
 import Settings from './pages/settings/Settings';
@@ -81,7 +80,6 @@ function App() {
                 <Route path="/developers" element={<DevelopersList />} />
                 <Route path="/developers/:id" element={<DeveloperProfile />} />
                 <Route path="/reports/traceability" element={<ArtifactTraceability />} />
-                <Route path="/reports/heatmap" element={<DeveloperHeatmap />} />
                 <Route path="/issues" element={<IssuesTracking />} />
                 <Route path="/settings/repositories" element={<Repositories />} />
                 <Route path="/settings" element={<Settings />} />
