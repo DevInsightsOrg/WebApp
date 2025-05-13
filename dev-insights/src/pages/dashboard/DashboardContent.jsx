@@ -102,7 +102,7 @@ const DashboardContent = ({ repoFullName }) => {
         <Paper sx={{ p: 2, textAlign: 'center' }}>
           <CommitIcon color="error" sx={{ fontSize: 48 }}/>
           <Typography variant="h5">{contributionMetrics.reduce((sum, v) => sum + v.commits, 0)}</Typography>
-          <Typography color="textSecondary">Top 5 Commits</Typography>
+          <Typography color="textSecondary">Fetched commit count</Typography>
         </Paper>
       </Grid>
       <Grid item xs={12} md={3}>
