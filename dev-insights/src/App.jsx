@@ -80,6 +80,7 @@ function App() {
                 <Route path="developers/quality-scores" element={<DeveloperQualityScores />} />
                 <Route path="/reports/traceability" element={<ArtifactTraceability />} />
                 <Route path="/code-contribution-analysis" element={<ContributorsPage />} />
+                <Route path="/issues" element={<IssuesTracking />} />
               </Route>
               
               {/* Default redirect */}

@@ -113,6 +113,7 @@ const MainLayout = () => {
     { text: 'Developer Quality Scores', icon: <AssessmentIcon />, path: '/developers/quality-scores' },
     { text: 'Code Contribution Analysis', icon: <AssessmentIcon />, path: '/code-contribution-analysis' },
     { text: 'Artifact Traceability', icon: <AccountTreeIcon />, path: '/reports/traceability' },
+    { text: 'Issues and Pull Requests Tracking', icon: <AssignmentIcon />, path: '/issues' },
   ];
 
   return (
