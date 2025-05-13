@@ -8,7 +8,8 @@ import {
   CardHeader,
   Box,
   CircularProgress,
-  Alert
+  Alert,
+  Stack
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -84,67 +85,78 @@ const DashboardContent = ({ repoFullName }) => {
 
   return (
     <Grid container spacing={3}>
-      <Grid item xs={12} md={3}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <PeopleIcon color="primary" sx={{ fontSize: 48 }}/>
-          <Typography variant="h5">{developerStats.total}</Typography>
-          <Typography color="textSecondary">Total Developers</Typography>
-        </Paper>
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <CodeIcon color="secondary" sx={{ fontSize: 48 }}/>
-          <Typography variant="h5">{developerStats.active}</Typography>
-          <Typography color="textSecondary">Active Developers</Typography>
-        </Paper>
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <CommitIcon color="error" sx={{ fontSize: 48 }}/>
-          <Typography variant="h5">{contributionMetrics.reduce((sum, v) => sum + v.commits, 0)}</Typography>
-          <Typography color="textSecondary">Fetched commit count</Typography>
-        </Paper>
-      </Grid>
-      <Grid item xs={12} md={3}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <CollaborationsIcon color="info" sx={{ fontSize: 48 }}/>
-          <Typography variant="h5">{collaborationCount}</Typography>
-          <Typography color="textSecondary">Collaborations</Typography>
-        </Paper>
+      {/* Left column: Stats */}
+      <Grid item xs={12} md={4}>
+        <Stack spacing={3}>
+          <Paper sx={{ p: 2, textAlign: 'center' }} elevation={2}>
+            <PeopleIcon color="primary" sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h5">{developerStats.total}</Typography>
+            <Typography color="textSecondary">Total Developers</Typography>
+          </Paper>
+
+          <Paper sx={{ p: 2, textAlign: 'center' }} elevation={2}>
+            <CodeIcon color="secondary" sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h5">{developerStats.active}</Typography>
+            <Typography color="textSecondary">Active Developers</Typography>
+          </Paper>
+        </Stack>
       </Grid>
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardHeader title="Developer Types" />
-          <CardContent sx={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={developerTypes} dataKey="value" outerRadius={80} label>
-                  {developerTypes.map(entry => (
-                    <Cell key={entry.name} fill={DEVELOPER_TYPES_COLORS[entry.name.slice(0,-1)]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <Grid item xs={12} md={4}>
+        <Stack spacing={3}>
+            <Paper sx={{ p: 2, textAlign: 'center' }} elevation={2}>
+            <CommitIcon color="error" sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h5">
+              {contributionMetrics.reduce((sum, v) => sum + v.commits, 0)}
+            </Typography>
+            <Typography color="textSecondary">Fetched commit count</Typography>
+          </Paper>
+
+          <Paper sx={{ p: 2, textAlign: 'center' }} elevation={2}>
+            <CollaborationsIcon color="info" sx={{ fontSize: 48, mb: 1 }} />
+            <Typography variant="h5">{collaborationCount}</Typography>
+            <Typography color="textSecondary">Collaborations</Typography>
+          </Paper>
+        </Stack>
       </Grid>
 
-      <Grid item xs={12} md={6}>
-        <Card>
-          <CardHeader title="Top Contributors" />
-          <CardContent sx={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={contributionMetrics}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="commits" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Right column: Charts */}
+      <Grid item xs={12} md={8}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardHeader title="Developer Types" />
+              <CardContent sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={developerTypes} dataKey="value" outerRadius={80} label>
+                      {developerTypes.map(entry => (
+                        <Cell key={entry.name} fill={DEVELOPER_TYPES_COLORS[entry.name.slice(0,-1)]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardHeader title="Top Contributors By Commits" />
+              <CardContent sx={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={contributionMetrics} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="commits" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       </Grid>
     </Grid>
   );
