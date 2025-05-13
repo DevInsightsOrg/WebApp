@@ -16,8 +16,10 @@ import DevelopersList from './pages/developers/DevelopersList';
 import DeveloperProfile from './pages/developers/DeveloperProfile';
 import ArtifactTraceability from './pages/reports/ArtifactTraceability';
 import DeveloperHeatmap from './pages/reports/DeveloperHeatmap';
+import IssuesTracking from './pages/IssuesTracking';
 import Repositories from './pages/settings/Repositories';
 import Settings from './pages/settings/Settings';
+import ContributorsPage from './pages/ContributorsPage';
 import ProcessRepository from './pages/repository/ProcessRepository';
 
 // Context Providers
@@ -46,7 +48,7 @@ const ProtectedRoute = ({ children }) => {
   }
   
   return isAuthenticated ? children : <Navigate to="/login" />;
-};
+  };
 
 function App() {
   return (
@@ -80,8 +82,10 @@ function App() {
                 <Route path="/developers/:id" element={<DeveloperProfile />} />
                 <Route path="/reports/traceability" element={<ArtifactTraceability />} />
                 <Route path="/reports/heatmap" element={<DeveloperHeatmap />} />
+                <Route path="/issues" element={<IssuesTracking />} />
                 <Route path="/settings/repositories" element={<Repositories />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/code-contribution-analysis" element={<ContributorsPage />} />
               </Route>
               
               {/* Default redirect */}
