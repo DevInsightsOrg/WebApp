@@ -18,6 +18,7 @@ import ArtifactTraceability from './pages/reports/ArtifactTraceability';
 import DeveloperHeatmap from './pages/reports/DeveloperHeatmap';
 import Repositories from './pages/settings/Repositories';
 import Settings from './pages/settings/Settings';
+import ProcessRepository from './pages/repository/ProcessRepository';
 
 // Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -60,6 +61,13 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
               </Route>
+
+              {/* Repository Processing Route */}
+              <Route path="/process-repository/:repoFullName" element={
+                <ProtectedRoute>
+                  <ProcessRepository />
+                </ProtectedRoute>
+              } />
               
               {/* Protected Routes */}
               <Route element={

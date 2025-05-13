@@ -25,6 +25,8 @@ import {
 import ForceGraph2D from 'react-force-graph-2d';
 import { useRepo } from '../../context/RepoContext';
 import graphDbService from '../../services/graphDbService';
+import RepositoryCheck from '../../components/repository/RepositoryCheck';
+import { useNavigate } from 'react-router-dom';
 
 // Color mapping for node types
 const NODE_COLORS = {
@@ -46,7 +48,7 @@ const EDGE_COLORS = {
 };
 
 const ArtifactTraceability = () => {
-  const { selectedRepo } = useRepo();
+  const { selectedRepoFullName } = useRepo();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
@@ -62,18 +64,19 @@ const ArtifactTraceability = () => {
   });
   const [showLabels, setShowLabels] = useState(true);
   const graphRef = useRef();
+  const navigate = useNavigate();
 
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
-      if (!selectedRepo) return;
+      if (!selectedRepoFullName) return;
       
       setLoading(true);
       setError(null);
       
       try {
         // Parse repository owner and name
-        const [repoOwner, repoName] = selectedRepo.split('/');
+        const [repoOwner, repoName] = selectedRepoFullName.split('/');
         
         // Fetch developers
         const developersData = await graphDbService.getDeveloperContributions(repoOwner, repoName);
@@ -121,19 +124,19 @@ const ArtifactTraceability = () => {
     };
     
     fetchInitialData();
-  }, [selectedRepo]);
+  }, [selectedRepoFullName]);
   
   // Fetch filtered graph data when filters change
   useEffect(() => {
     const fetchFilteredGraphData = async () => {
-      if (!selectedRepo || (!selectedDeveloper && !selectedCategory && graphMode === 'full')) return;
+      if (!selectedRepoFullName || (!selectedDeveloper && !selectedCategory && graphMode === 'full')) return;
       
       setLoading(true);
       setError(null);
       
       try {
         // Parse repository owner and name
-        const [repoOwner, repoName] = selectedRepo.split('/');
+        const [repoOwner, repoName] = selectedRepoFullName.split('/');
         
         let params = {};
         
@@ -157,7 +160,7 @@ const ArtifactTraceability = () => {
     if (graphMode !== 'full' || selectedDeveloper || selectedCategory) {
       fetchFilteredGraphData();
     }
-  }, [selectedRepo, graphMode, selectedDeveloper, selectedCategory]);
+  }, [selectedRepoFullName, graphMode, selectedDeveloper, selectedCategory]);
   
   // Handle graph mode change
   const handleGraphModeChange = (event, newMode) => {
@@ -233,7 +236,7 @@ const ArtifactTraceability = () => {
     issues: graphData.nodes.filter(node => node.type === 'issue').length
   };
 
-  if (!selectedRepo) {
+  if (!selectedRepoFullName) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="info">
@@ -244,6 +247,11 @@ const ArtifactTraceability = () => {
   }
 
   return (
+    
+    <RepositoryCheck repoFullName={selectedRepoFullName}
+    onRepositoryStatus={(status) => {
+    console.log("Repository status received in ArtifactTraceability:", status);
+  }}>
     <Box>
       <Typography variant="h4" gutterBottom>
         Artifact Traceability Graph
@@ -566,6 +574,7 @@ const ArtifactTraceability = () => {
         </Grid>
       )}
     </Box>
+    </RepositoryCheck>
   );
 };
 

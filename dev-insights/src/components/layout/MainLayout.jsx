@@ -95,9 +95,14 @@ const MainLayout = () => {
   };
 
   const handleRepoSelect = (repoId) => {
-    selectRepository(repoId);
-    handleRepoMenuClose();
-  };
+  // Find the full repository object to get both id and fullName
+  const selectedRepository = repositories.find(r => r.id === repoId);
+  if (selectedRepository) {
+    // Pass both parameters to selectRepository
+    selectRepository(repoId, selectedRepository.fullName);
+  }
+  handleRepoMenuClose();
+};
 
   const handleSync = async () => {
     await syncRepository();

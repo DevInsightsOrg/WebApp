@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import apiService from '../services/apiService';
+import authService from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const data = await apiService.validateToken();
+        const data = await authService.validateToken();
         if (data && data.user) {
           setUser(data.user);
           setIsAuthenticated(true);
@@ -38,42 +38,68 @@ export const AuthProvider = ({ children }) => {
     validateToken();
   }, []);
 
-  const login = async (code) => {
-    // Prevent multiple concurrent login attempts
-    if (isLoginInProgress) {
-      console.log("Login already in progress, skipping");
-      return false;
+  // In your AuthProvider component, update the login function:
+
+const login = async (code) => {
+  // Prevent multiple concurrent login attempts
+  if (isLoginInProgress) {
+    console.log("Login already in progress, skipping");
+    return false;
+  }
+  
+  setIsLoginInProgress(true);
+  setAuthError(null);
+  
+  try {
+    // If we're already authenticated, no need to login again
+    if (isAuthenticated && user) {
+      console.log("Already authenticated, skipping login");
+      return true;
     }
     
-    setIsLoginInProgress(true);
-    setAuthError(null);
+    console.time('login-exchange');
+    const data = await authService.exchangeCodeForToken(code);
+    console.timeEnd('login-exchange');
     
-    try {
-      // If we're already authenticated, no need to login again
-      if (isAuthenticated && user) {
-        console.log("Already authenticated, skipping login");
-        return true;
-      }
+    // Check if we received a token (minimal requirement for authentication)
+    if (data && data.token) {
+      console.log("Received valid token");
       
-      const data = await apiService.exchangeCodeForToken(code);
+      // Set as authenticated as soon as we have a token
+      setIsAuthenticated(true);
       
-      if (data && data.token && data.user) {
-        // Only update state if we have both token and user
+      // If we also received user data, set it
+      if (data.user) {
+        console.log("Received user data with token");
         setUser(data.user);
-        setIsAuthenticated(true);
-        return true;
+      } else {
+        // If no user data, try to fetch it separately
+        console.log("No user data received, fetching separately");
+        try {
+          const userData = await authService.validateToken();
+          if (userData && userData.user) {
+            setUser(userData.user);
+          }
+        } catch (userError) {
+          console.error("Error fetching user data:", userError);
+          // Continue anyway as we have the token
+        }
       }
       
-      setAuthError('Invalid response from authentication server');
-      return false;
-    } catch (error) {
-      console.error('Login failed:', error);
-      setAuthError(error.message || 'Authentication failed');
-      return false;
-    } finally {
-      setIsLoginInProgress(false);
+      return true;
     }
-  };
+    
+    console.error("Invalid response from authentication server");
+    setAuthError('Invalid response from authentication server');
+    return false;
+  } catch (error) {
+    console.error('Login failed:', error);
+    setAuthError(error.message || 'Authentication failed');
+    return false;
+  } finally {
+    setIsLoginInProgress(false);
+  }
+};
 
   const logout = () => {
     localStorage.removeItem('auth_token');
