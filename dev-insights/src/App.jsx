@@ -77,11 +77,8 @@ function App() {
                 </ProtectedRoute>
               }>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/developers" element={<DevelopersList />} />
-                <Route path="/developers/:id" element={<DeveloperProfile />} />
                 <Route path="developers/quality-scores" element={<DeveloperQualityScores />} />
                 <Route path="/reports/traceability" element={<ArtifactTraceability />} />
-                <Route path="/issues" element={<IssuesTracking />} />
                 <Route path="/code-contribution-analysis" element={<ContributorsPage />} />
               </Route>
               
