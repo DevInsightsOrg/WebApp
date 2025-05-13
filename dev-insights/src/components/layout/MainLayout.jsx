@@ -65,10 +65,7 @@ const MainLayout = () => {
   const { 
     repositories, 
     selectedRepo, 
-    selectRepository, 
-    syncRepository,
-    lastSyncDate,
-    isLoading
+    selectRepository
   } = useRepo();
   const navigate = useNavigate();
 
@@ -107,9 +104,6 @@ const MainLayout = () => {
   handleRepoMenuClose();
 };
 
-  const handleSync = async () => {
-    await syncRepository();
-  };
 
   const selectedRepoName = repositories.find(r => r.id === selectedRepo)?.name || 'Select Repository';
 
@@ -120,8 +114,6 @@ const MainLayout = () => {
     { text: 'Code Contribution Analysis', icon: <AssessmentIcon />, path: '/code-contribution-analysis' },
     { text: 'Issues and Pull Requests Tracking', icon: <AssignmentIcon />, path: '/issues' },
     { text: 'Artifact Traceability', icon: <AccountTreeIcon />, path: '/reports/traceability' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-    { text: 'Repositories', icon: <StorageIcon />, path: '/settings/repositories' },
   ];
 
   return (
@@ -165,21 +157,8 @@ const MainLayout = () => {
                 {repo.name}
               </MenuItem>
             ))}
-            <Divider />
-            <MenuItem onClick={() => navigate('/settings/repositories')}>
-              Manage Repositories
-            </MenuItem>
           </Menu>
-          
-          {/* Sync Button */}
-          <IconButton 
-            color="inherit" 
-            onClick={handleSync} 
-            disabled={isLoading || !selectedRepo}
-            title={lastSyncDate ? `Last synced: ${new Date(lastSyncDate).toLocaleString()}` : 'Sync repository'}
-          >
-            <RefreshIcon />
-          </IconButton>
+        
           
           {/* User Menu */}
           <IconButton onClick={handleMenuOpen} color="inherit">
@@ -198,7 +177,6 @@ const MainLayout = () => {
               {user?.name || 'User'}
             </MenuItem>
             <Divider />
-            <MenuItem onClick={() => navigate('/settings')}>Settings</MenuItem>
             <MenuItem onClick={handleLogout}>Logout</MenuItem>
           </Menu>
         </Toolbar>

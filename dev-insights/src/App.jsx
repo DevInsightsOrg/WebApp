@@ -81,8 +81,6 @@ function App() {
                 <Route path="/developers/:id" element={<DeveloperProfile />} />
                 <Route path="/reports/traceability" element={<ArtifactTraceability />} />
                 <Route path="/issues" element={<IssuesTracking />} />
-                <Route path="/settings/repositories" element={<Repositories />} />
-                <Route path="/settings" element={<Settings />} />
                 <Route path="/code-contribution-analysis" element={<ContributorsPage />} />
               </Route>
               
