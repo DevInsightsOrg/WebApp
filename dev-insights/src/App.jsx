@@ -20,7 +20,7 @@ import Repositories from './pages/settings/Repositories';
 import Settings from './pages/settings/Settings';
 import ContributorsPage from './pages/ContributorsPage';
 import ProcessRepository from './pages/repository/ProcessRepository';
-
+import DeveloperQualityScores from './pages/developers/DeveloperQualityScores';
 // Context Providers
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RepoProvider } from './context/RepoContext';
@@ -79,6 +79,7 @@ function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/developers" element={<DevelopersList />} />
                 <Route path="/developers/:id" element={<DeveloperProfile />} />
+                <Route path="developers/quality-scores" element={<DeveloperQualityScores />} />
                 <Route path="/reports/traceability" element={<ArtifactTraceability />} />
                 <Route path="/issues" element={<IssuesTracking />} />
                 <Route path="/code-contribution-analysis" element={<ContributorsPage />} />

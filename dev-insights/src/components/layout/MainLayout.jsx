@@ -111,6 +111,7 @@ const MainLayout = () => {
   const navItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Developers', icon: <PeopleIcon />, path: '/developers' },
+    { text: 'Developer Quality Scores', icon: <AssessmentIcon />, path: '/developers/quality-scores' },
     { text: 'Code Contribution Analysis', icon: <AssessmentIcon />, path: '/code-contribution-analysis' },
     { text: 'Issues and Pull Requests Tracking', icon: <AssignmentIcon />, path: '/issues' },
     { text: 'Artifact Traceability', icon: <AccountTreeIcon />, path: '/reports/traceability' },
