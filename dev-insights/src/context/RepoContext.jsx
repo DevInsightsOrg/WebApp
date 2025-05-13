@@ -19,7 +19,6 @@ export const RepoProvider = ({ children }) => {
   );
   
   const [isLoading, setIsLoading] = useState(false);
-  const [lastSyncDate, setLastSyncDate] = useState(null);
   const [repositoryStatus, setRepositoryStatus] = useState({
     exists: false,
     isProcessed: false,
@@ -67,22 +66,6 @@ export const RepoProvider = ({ children }) => {
     fetchRepositories();
   }, [isAuthenticated]);
 
-  // Fetch last sync date for selected repo
-  useEffect(() => {
-    const fetchLastSyncDate = async () => {
-      if (!selectedRepo) return;
-      
-      try {
-        const data = await apiService.getRepositoryLastSync(selectedRepo);
-        setLastSyncDate(data.lastSyncDate);
-      } catch (error) {
-        console.error('Failed to fetch last sync date:', error);
-      }
-    };
-
-    fetchLastSyncDate();
-  }, [selectedRepo]);
-
   // Check repository status when repository changes
   useEffect(() => {
     const checkStatus = async () => {
@@ -120,27 +103,6 @@ export const RepoProvider = ({ children }) => {
     setSelectedRepoFullName(null);
     localStorage.removeItem('selected_repo');
     localStorage.removeItem('selected_repo_full_name');
-    setLastSyncDate(null);
-  };
-
-  const syncRepository = async () => {
-    if (!selectedRepo) return;
-    
-    setIsLoading(true);
-    try {
-      const data = await apiService.syncRepository(selectedRepo);
-      setLastSyncDate(data.lastSyncDate);
-      
-      // After syncing, refresh repository status
-      await checkSelectedRepoStatus();
-      
-      return true;
-    } catch (error) {
-      console.error('Repository sync failed:', error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const checkSelectedRepoStatus = async () => {
@@ -257,13 +219,11 @@ const processRepository = async (repoFullName) => {
         repositories,
         selectedRepo,
         selectedRepoFullName,
-        lastSyncDate,
         isLoading,
         isProcessing,
         repositoryStatus,
         selectRepository: handleSelectRepo,
         clearSelectedRepository: handleClearSelection,
-        syncRepository,
         processRepository,
         checkSelectedRepoStatus,
         getRepositoryById,

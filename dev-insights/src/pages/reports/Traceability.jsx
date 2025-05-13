@@ -1,34 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
   Paper,
-  Grid,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
+  Tabs,
+  Tab,
   CircularProgress,
   Alert,
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ToggleButtonGroup,
-  ToggleButton
+  Button,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody
 } from '@mui/material';
 import ForceGraph2D from 'react-force-graph-2d';
 import { useRepo } from '../../context/RepoContext';
 import graphDbService from '../../services/graphDbService';
-import RepositoryCheck from '../../components/repository/RepositoryCheck';
-import { useNavigate } from 'react-router-dom';
 
-// Color mapping for node types
+const TabPanel = ({ children, value, index }) => (
+  <div role="tabpanel" hidden={value !== index} style={{ width: '100%' }}>
+    {value === index && <Box sx={{ p: 2 }}>{children}</Box>}
+  </div>
+);
+
 const NODE_COLORS = {
   developer: '#8884d8',
   file: '#82ca9d',
@@ -36,8 +32,6 @@ const NODE_COLORS = {
   issue: '#ff8042',
   pullRequest: '#0088FE'
 };
-
-// Edge color mapping based on relationship type
 const EDGE_COLORS = {
   collaborated: '#8884d8',
   modified: '#82ca9d',
@@ -51,524 +45,322 @@ const TraceabilityContent = () => {
   const { selectedRepoFullName } = useRepo();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [graphMode, setGraphMode] = useState('full'); // 'full', 'developer', 'file'
-  const [selectedDeveloper, setSelectedDeveloper] = useState('');
+  const [tab, setTab] = useState(0);
   const [developers, setDevelopers] = useState([]);
-  const [fileCategories, setFileCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [developerCategories, setDeveloperCategories] = useState({
-    connectors: [],
-    mavens: [],
-    jacks: []
-  });
-  const [showLabels, setShowLabels] = useState(true);
+  const [jacks, setJacks] = useState([]);
+  const [mavens, setMavens] = useState([]);
+  const [connectors, setConnectors] = useState([]);
+  const [criticalFiles, setCriticalFiles] = useState([]);
+  const [collaborations, setCollaborations] = useState([]);
+  const [replacements, setReplacements] = useState([]);
+  const [knowledgeDist, setKnowledgeDist] = useState(null);
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const graphRef = useRef();
-  const navigate = useNavigate();
 
-  // Fetch initial data
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchAll = async () => {
       if (!selectedRepoFullName) return;
-      
       setLoading(true);
       setError(null);
-      
-      try {
-        // Parse repository owner and name
-        const [repoOwner, repoName] = selectedRepoFullName.split('/');
-        
-        // Fetch developers
-        const developersData = await graphDbService.getDeveloperContributions(repoOwner, repoName);
-        setDevelopers(developersData);
-        
-        // Fetch developer categorization
-        const categorization = await Promise.all([
-          graphDbService.getJackDevelopers(repoOwner, repoName),
-          graphDbService.getMavenDevelopers(repoOwner, repoName),
-          graphDbService.getConnectorDevelopers(repoOwner, repoName)
-        ]);
-        
-        setDeveloperCategories({
-          jacks: categorization[0],
-          mavens: categorization[1],
-          connectors: categorization[2]
-        });
-        
-        // Fetch critical files to extract categories
-        const criticalFiles = await graphDbService.getCriticalFiles(repoOwner, repoName);
-        
-        // Process file paths to extract categories
-        const categories = criticalFiles.reduce((acc, file) => {
-          const pathParts = file.file_path.split('/');
-          const category = pathParts.length > 1 ? pathParts[0] : 'root';
-          
-          if (!acc.includes(category)) {
-            acc.push(category);
-          }
-          
-          return acc;
-        }, []);
-        
-        setFileCategories(categories);
-        
-        // Get graph data
-        const atgData = await graphDbService.getArtifactTraceabilityGraph(repoOwner, repoName);
-        setGraphData(atgData);
-      } catch (err) {
-        console.error('Error fetching traceability data:', err);
-        setError('Failed to load artifact traceability data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchInitialData();
-  }, [selectedRepoFullName]);
-  
-  // Fetch filtered graph data when filters change
-  useEffect(() => {
-    const fetchFilteredGraphData = async () => {
-      if (!selectedRepoFullName || (!selectedDeveloper && !selectedCategory && graphMode === 'full')) return;
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        // Parse repository owner and name
-        const [repoOwner, repoName] = selectedRepoFullName.split('/');
-        
-        let params = {};
-        
-        if (graphMode === 'developer' && selectedDeveloper) {
-          params.developerId = selectedDeveloper;
-        } else if (graphMode === 'file' && selectedCategory) {
-          params.fileCategory = selectedCategory;
+      const [owner, repo] = selectedRepoFullName.split('/');
+
+      const safeFetch = async (fetchPromise) => {
+        try {
+          return await fetchPromise;
+        } catch (err) {
+          console.error('Safe fetch error:', err);
+          return null;
         }
-        
-        // Fetch filtered ATG data
-        const atgData = await graphDbService.getArtifactTraceabilityGraph(repoOwner, repoName, params);
-        setGraphData(atgData);
-      } catch (err) {
-        console.error('Error fetching filtered graph data:', err);
-        setError('Failed to load filtered graph data. Please try again.');
-      } finally {
-        setLoading(false);
+      };
+
+      // Parallel core data fetch
+      const [devs, categories, critFiles, collabs, kd] = await Promise.all([
+        safeFetch(graphDbService.getDeveloperContributions(owner, repo)),
+        safeFetch(graphDbService.getAllCategorizedDevelopers(owner, repo)),
+        safeFetch(graphDbService.getCriticalFiles(owner, repo)),
+        safeFetch(graphDbService.getCollaborations(owner, repo)),
+        safeFetch(graphDbService.getKnowledgeDistribution(owner, repo))
+      ]);
+
+      if (devs) setDevelopers(devs);
+      if (categories) {
+        setJacks(categories.jacks || []);
+        setMavens(categories.mavens || []);
+        setConnectors(categories.connectors || []);
       }
+      if (critFiles) setCriticalFiles(critFiles);
+      if (collabs) setCollaborations(collabs);
+      if (kd) setKnowledgeDist(kd);
+
+      // Fetch replacements per developer and tag leaving developer
+      if (devs) {
+        const replResults = await Promise.all(
+          devs.map(async dev => {
+            const reps = await safeFetch(
+              graphDbService.getDeveloperReplacements(owner, repo, dev.github)
+            );
+            return (reps || []).map(rep => ({ ...rep, leavingDev: dev.name }));
+          })
+        );
+        setReplacements(replResults.flat());
+      }
+
+      // Fetch graph last
+      const graph = await safeFetch(
+        graphDbService.getArtifactTraceabilityGraph(owner, repo)
+      );
+      if (graph) setGraphData(graph);
+
+      setLoading(false);
     };
-    
-    if (graphMode !== 'full' || selectedDeveloper || selectedCategory) {
-      fetchFilteredGraphData();
-    }
-  }, [selectedRepoFullName, graphMode, selectedDeveloper, selectedCategory]);
-  
-  // Handle graph mode change
-  const handleGraphModeChange = (event, newMode) => {
-    if (newMode) {
-      setGraphMode(newMode);
-      
-      // Reset selections when mode changes
-      if (newMode !== 'developer') {
-        setSelectedDeveloper('');
-      }
-      if (newMode !== 'file') {
-        setSelectedCategory('');
-      }
-    }
-  };
-  
-  // Handle developer selection change
-  const handleDeveloperChange = (event) => {
-    setSelectedDeveloper(event.target.value);
-  };
-  
-  // Handle file category selection change
-  const handleCategoryChange = (event) => {
-    setSelectedCategory(event.target.value);
-  };
-  
-  // Toggle node labels
-  const toggleLabels = () => {
-    setShowLabels(!showLabels);
-  };
-  
-  // Center and zoom graph
-  const resetGraphView = () => {
-    if (graphRef.current) {
-      graphRef.current.zoomToFit(400, 50);
-    }
-  };
-  
-  // Get developer category for a developer
-  const getDeveloperCategory = (githubUsername) => {
-    const isJack = developerCategories.jacks.some(dev => dev.github === githubUsername);
-    const isMaven = developerCategories.mavens.some(dev => dev.github === githubUsername);
-    const isConnector = developerCategories.connectors.some(dev => dev.github === githubUsername);
-    
-    if (isConnector) return 'Connector';
-    if (isMaven) return 'Maven';
-    if (isJack) return 'Jack';
-    return 'Uncategorized';
-  };
-  
-  // Get category color
-  const getCategoryColor = (category) => {
-    switch (category) {
-      case 'Connector':
-        return '#8884d8';
-      case 'Maven':
-        return '#82ca9d';
-      case 'Jack':
-        return '#ffc658';
-      default:
-        return '#cccccc';
-    }
-  };
-  
-  // Calculate graph stats
-  const graphStats = {
-    nodes: graphData.nodes.length,
-    links: graphData.links.length,
-    developers: graphData.nodes.filter(node => node.type === 'developer').length,
-    files: graphData.nodes.filter(node => node.type === 'file').length,
-    commits: graphData.nodes.filter(node => node.type === 'commit').length,
-    prs: graphData.nodes.filter(node => node.type === 'pullRequest').length,
-    issues: graphData.nodes.filter(node => node.type === 'issue').length
-  };
+    fetchAll();
+  }, [selectedRepoFullName]);
+
+  const handleTabChange = (_e, newVal) => setTab(newVal);
+  const resetGraphView = () => graphRef.current && graphRef.current.zoomToFit(400, 50);
 
   if (!selectedRepoFullName) {
+    return <Alert severity="info">Please select a repository to view artifact traceability.</Alert>;
+  }
+  if (loading) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="info">
-          Please select a repository to view artifact traceability.
-        </Alert>
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
       </Box>
     );
   }
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
 
   return (
-      <Box>
-        <Typography variant="h4" gutterBottom>
-          Artifact Traceability Graph
-        </Typography>
-        <Typography variant="subtitle1" color="textSecondary" paragraph>
-          Visualize the relationships between developers, files, commits, pull requests, and issues.
-        </Typography>
-        
-        {/* Graph Controls */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <Typography variant="subtitle2" gutterBottom>
-                Graph Mode:
-              </Typography>
-              <ToggleButtonGroup
-                value={graphMode}
-                exclusive
-                onChange={handleGraphModeChange}
-                size="small"
-                fullWidth
-              >
-                <ToggleButton value="full">
-                  Full Graph
-                </ToggleButton>
-                <ToggleButton value="developer">
-                  Developer Focus
-                </ToggleButton>
-                <ToggleButton value="file">
-                  File Category
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Grid>
-            
-            {graphMode === 'developer' && (
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="developer-select-label">Developer</InputLabel>
-                  <Select
-                    labelId="developer-select-label"
-                    id="developer-select"
-                    value={selectedDeveloper}
-                    label="Developer"
-                    onChange={handleDeveloperChange}
-                    disabled={loading || developers.length === 0}
-                  >
-                    {developers.map(dev => (
-                      <MenuItem key={dev.github} value={dev.github}>
-                        {dev.name || dev.github} ({getDeveloperCategory(dev.github)})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
-            
-            {graphMode === 'file' && (
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="category-select-label">File Category</InputLabel>
-                  <Select
-                    labelId="category-select-label"
-                    id="category-select"
-                    value={selectedCategory}
-                    label="File Category"
-                    onChange={handleCategoryChange}
-                    disabled={loading || fileCategories.length === 0}
-                  >
-                    {fileCategories.map(category => (
-                      <MenuItem key={category} value={category}>
-                        {category}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
-            
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  onClick={toggleLabels}
-                  fullWidth
-                >
-                  {showLabels ? 'Hide Labels' : 'Show Labels'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={resetGraphView}
-                  fullWidth
-                >
-                  Reset View
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Artifact Traceability Dashboard
+      </Typography>
+      <Tabs
+        value={tab}
+        onChange={handleTabChange}
+        variant="scrollable"
+        scrollButtons="auto"
+      >
+        <Tab label="Graph" />
+        <Tab label="Contributions" />
+        <Tab label="Jacks" />
+        <Tab label="Mavens" />
+        <Tab label="Connectors" />
+        <Tab label="Critical Files" />
+        <Tab label="Collaborations" />
+        <Tab label="Replacements" />
+        <Tab label="Knowledge Dist." />
+      </Tabs>
+
+      {/* Graph View */}
+      <TabPanel value={tab} index={0}>
+        <Button variant="outlined" onClick={resetGraphView} sx={{ mb: 2 }}>
+          Reset View
+        </Button>
+        <Paper sx={{ height: 600 }}>
+          <ForceGraph2D
+            ref={graphRef}
+            graphData={graphData}
+            nodeRelSize={6}
+            nodeColor={node => NODE_COLORS[node.type] || '#cccccc'}
+            linkColor={link => EDGE_COLORS[link.type] || '#aaaaaa'}
+          />
         </Paper>
-        
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : error ? (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        ) : (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={9}>
-              <Paper sx={{ height: 600, position: 'relative' }}>
-                <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}>
-                  <Chip 
-                    label={`${graphStats.nodes} nodes, ${graphStats.links} connections`}
-                    variant="outlined"
-                    size="small"
-                  />
-                </Box>
-                {graphData.nodes.length > 0 ? (
-                  <ForceGraph2D
-                    ref={graphRef}
-                    graphData={graphData}
-                    nodeRelSize={6}
-                    nodeVal={(node) => {
-                      if (node.type === 'developer') return 10;
-                      return 5;
-                    }}
-                    nodeColor={(node) => {
-                      if (node.type === 'developer') {
-                        return getCategoryColor(getDeveloperCategory(node.id));
-                      }
-                      return NODE_COLORS[node.type] || '#cccccc';
-                    }}
-                    linkColor={(link) => EDGE_COLORS[link.type] || '#aaaaaa'}
-                    nodeLabel={(node) => {
-                      if (node.type === 'developer') {
-                        const category = getDeveloperCategory(node.id);
-                        return `${node.name || node.id} (${category})`;
-                      } else if (node.type === 'file') {
-                        return `File: ${node.name || node.id}`;
-                      } else if (node.type === 'commit') {
-                        return `Commit: ${node.id.substring(0, 7)}`;
-                      } else if (node.type === 'pullRequest') {
-                        return `PR: ${node.name || node.id}`;
-                      } else if (node.type === 'issue') {
-                        return `Issue: ${node.name || node.id}`;
-                      }
-                      return node.id;
-                    }}
-                    linkLabel={(link) => `${link.source.id || link.source} ${link.type} ${link.target.id || link.target}`}
-                    linkWidth={(link) => 1 + (link.value ? Math.sqrt(link.value) / 3 : 0)}
-                    nodeCanvasObjectMode={() => showLabels ? 'after' : undefined}
-                    nodeCanvasObject={(node, ctx, globalScale) => {
-                      if (!showLabels) return;
-                      
-                      const label = node.name || 
-                        (typeof node.id === 'string' ? node.id.split('/').pop() : node.id);
-                      
-                      const fontSize = 12 / globalScale;
-                      ctx.font = `${fontSize}px Sans-Serif`;
-                      ctx.textAlign = 'center';
-                      ctx.textBaseline = 'middle';
-                      ctx.fillStyle = 'black';
-                      ctx.fillText(label, node.x, node.y + 10);
-                    }}
-                    warmupTicks={100}
-                    cooldownTicks={100}
-                    onEngineStop={() => resetGraphView()}
-                  />
-                ) : (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <Typography variant="body1" color="textSecondary">
-                      No graph data available with the current filters.
-                    </Typography>
-                  </Box>
-                )}
-              </Paper>
-            </Grid>
-            
-            <Grid item xs={12} md={3}>
-              <Card sx={{ mb: 2 }}>
-                <CardHeader title="Graph Legend" titleTypographyProps={{ variant: 'h6' }} />
-                <CardContent>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Node Types:
-                  </Typography>
-                  <List dense>
-                    {Object.entries(NODE_COLORS).map(([type, color]) => (
-                      <ListItem key={type} disablePadding>
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: '50%',
-                            bgcolor: color,
-                            mr: 1
-                          }}
-                        />
-                        <ListItemText primary={type.charAt(0).toUpperCase() + type.slice(1)} />
-                      </ListItem>
-                    ))}
-                  </List>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Developer Types:
-                  </Typography>
-                  <List dense>
-                    <ListItem disablePadding>
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: '50%',
-                          bgcolor: '#8884d8',
-                          mr: 1
-                        }}
-                      />
-                      <ListItemText 
-                        primary="Connector" 
-                        secondary="Bridges different parts of the project"
-                      />
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: '50%',
-                          bgcolor: '#82ca9d',
-                          mr: 1
-                        }}
-                      />
-                      <ListItemText 
-                        primary="Maven" 
-                        secondary="Specialist with deep, focused contributions"
-                      />
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: '50%',
-                          bgcolor: '#ffc658',
-                          mr: 1
-                        }}
-                      />
-                      <ListItemText 
-                        primary="Jack" 
-                        secondary="Generalist with broad knowledge"
-                      />
-                    </ListItem>
-                  </List>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Connection Types:
-                  </Typography>
-                  <List dense>
-                    {Object.entries(EDGE_COLORS).map(([type, color]) => (
-                      <ListItem key={type} disablePadding>
-                        <Box
-                          sx={{
-                            width: 16,
-                            height: 4,
-                            bgcolor: color,
-                            mr: 1
-                          }}
-                        />
-                        <ListItemText primary={type.charAt(0).toUpperCase() + type.slice(1)} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader title="Graph Statistics" titleTypographyProps={{ variant: 'h6' }} />
-                <CardContent>
-                  <List dense>
-                    <ListItem disablePadding>
-                      <ListItemText 
-                        primary={`${graphStats.developers} Developers`}
-                      />
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemText 
-                        primary={`${graphStats.files} Files`}
-                      />
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemText 
-                        primary={`${graphStats.commits} Commits`}
-                      />
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemText 
-                        primary={`${graphStats.prs} Pull Requests`}
-                      />
-                    </ListItem>
-                    <ListItem disablePadding>
-                      <ListItemText 
-                        primary={`${graphStats.issues} Issues`}
-                      />
-                    </ListItem>
-                  </List>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Typography variant="body2" color="textSecondary">
-                    The Artifact Traceability Graph visualizes connections between developers and artifacts
-                    across the repository, showing collaboration patterns and knowledge distribution in the ReMediCard.io project.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+      </TabPanel>
+
+      {/* Contributions Table */}
+      <TabPanel value={tab} index={1}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Commits</TableCell>
+                <TableCell>Files Touched</TableCell>
+                <TableCell>Total Files</TableCell>
+                <TableCell>Knowledge Breadth</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {developers.map(dev => (
+                <TableRow key={dev.github}>
+                  <TableCell>{dev.name}</TableCell>
+                  <TableCell>{dev.commits}</TableCell>
+                  <TableCell>{dev.files_touched}</TableCell>
+                  <TableCell>{dev.total_files}</TableCell>
+                  <TableCell>{(dev.knowledge_breadth * 100).toFixed(1)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Jacks Table */}
+      <TabPanel value={tab} index={2}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Files Reached</TableCell>
+                <TableCell>Total Files</TableCell>
+                <TableCell>Knowledge Breadth</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {jacks.map(dev => (
+                <TableRow key={dev.github}>
+                  <TableCell>{dev.name}</TableCell>
+                  <TableCell>{dev.files_reached}</TableCell>
+                  <TableCell>{dev.total_files}</TableCell>
+                  <TableCell>{(dev.knowledge_breadth * 100).toFixed(1)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Mavens Table */}
+      <TabPanel value={tab} index={3}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Rare Files Count</TableCell>
+                <TableCell>Mavenness</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {mavens.map(dev => (
+                <TableRow key={dev.github}>
+                  <TableCell>{dev.name}</TableCell>
+                  <TableCell>{dev.rare_files_count}</TableCell>
+                  <TableCell>{(dev.mavenness * 100).toFixed(1)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Connectors Table */}
+      <TabPanel value={tab} index={4}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Betweenness Centrality</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {connectors.map(dev => (
+                <TableRow key={dev.github}>
+                  <TableCell>{dev.name}</TableCell>
+                  <TableCell>{dev.betweenness_centrality}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Critical Files Table */}
+      <TabPanel value={tab} index={5}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>File Path</TableCell>
+                <TableCell>Filename</TableCell>
+                <TableCell>Contributors</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {criticalFiles.map(file => (
+                <TableRow key={file.file_path}>
+                  <TableCell>{file.file_path}</TableCell>
+                  <TableCell>{file.filename}</TableCell>
+                  <TableCell>{file.contributors}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Collaborations Table */}
+      <TabPanel value={tab} index={6}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Developer 1</TableCell>
+                <TableCell>Developer 2</TableCell>
+                <TableCell>Strength</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {collaborations.map(pair => (
+                <TableRow key={`${pair.developer1}-${pair.developer2}`}> 
+                  <TableCell>{pair.name1}</TableCell>
+                  <TableCell>{pair.name2}</TableCell>
+                  <TableCell>{pair.collaboration_strength}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Replacements Table */}
+      <TabPanel value={tab} index={7}>
+        <TableContainer component={Paper}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Leaving Developer</TableCell>
+                <TableCell>Replacement</TableCell>
+                <TableCell>Leaving Files</TableCell>
+                <TableCell>Shared Files</TableCell>
+                <TableCell>Overlap Ratio</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {replacements.map(rep => (
+                <TableRow key={`${rep.leavingDev}-${rep.github}`}> 
+                  <TableCell>{rep.leavingDev}</TableCell>
+                  <TableCell>{rep.name}</TableCell>
+                  <TableCell>{rep.leaving_dev_file_count}</TableCell>
+                  <TableCell>{rep.shared_file_count}</TableCell>
+                  <TableCell>{(rep.overlap_ratio * 100).toFixed(1)}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </TabPanel>
+
+      {/* Knowledge Distribution */}
+      <TabPanel value={tab} index={8}>
+        {knowledgeDist && (
+          <Paper sx={{ p: 2 }}>
+            <Typography>Top Contributor: {knowledgeDist.top_contributor}</Typography>
+            <Typography>Top Coverage: {(knowledgeDist.top_coverage * 100).toFixed(1)}%</Typography>
+            <Typography>Average Coverage: {(knowledgeDist.average_coverage * 100).toFixed(1)}%</Typography>
+            <Typography>Std Dev: {(knowledgeDist.coverage_std_dev * 100).toFixed(1)}%</Typography>
+            <Typography>Skewness: {knowledgeDist.skewness.toFixed(2)}</Typography>
+            <Typography>Distribution: {knowledgeDist.distribution_type}</Typography>
+          </Paper>
         )}
-      </Box>
+      </TabPanel>
+    </Box>
   );
 };
 
